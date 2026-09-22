@@ -2,13 +2,36 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 import sqlite3
 import os
-import database
 
 app = Flask(__name__)
 CORS(app)
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "shop.db")
+DB_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "shop.db"
+)
+
+
+def init_database():
+    conn = sqlite3.connect(DB_FILE)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            category TEXT,
+            buy_price REAL DEFAULT 0,
+            sell_price REAL DEFAULT 0,
+            stock INTEGER DEFAULT 0,
+            image TEXT
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+init_database()
 
 
 @app.route("/api/products")
