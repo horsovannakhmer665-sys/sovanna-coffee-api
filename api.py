@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 import os
 import psycopg
@@ -28,11 +28,10 @@ def init_database():
             """)
         conn.commit()
 
+@app.route("/")
 
-init_database()
-
-
-@app.route("/api/products")
+# GET - បង្ហាញទំនិញទាំងអស់
+@app.route("/api/products", methods=["GET"])
 def products():
     with psycopg.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
@@ -56,6 +55,49 @@ def products():
         })
 
     return jsonify(result)
+
+
+# POST - បញ្ចូលទំនិញថ្មី
+@app.route("/api/products", methods=["POST"])
+def add_product():
+    data = request.get_json()
+
+    name = data.get("name")
+    category = data.get("category")
+    buy_price = data.get("buy_price", 0)
+    sell_price = data.get("sell_price", 0)
+    stock = data.get("stock", 0)
+    image = data.get("image")
+
+    if not name:
+        return jsonify({
+            "error": "ត្រូវបញ្ចូលឈ្មោះទំនិញ"
+        }), 400
+
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO products
+                (name, category, buy_price, sell_price, stock, image)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                name,
+                category,
+                buy_price,
+                sell_price,
+                stock,
+                image
+            ))
+
+            product_id = cur.fetchone()[0]
+
+        conn.commit()
+
+    return jsonify({
+        "message": "បានបញ្ចូលទំនិញ",
+        "id": product_id
+    }), 201
 
 
 @app.route("/")
