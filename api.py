@@ -1,34 +1,32 @@
 from flask import Flask, jsonify
 from flask_cors import CORS
-import sqlite3
 import os
+import psycopg
 
 app = Flask(__name__)
 CORS(app)
 
-DB_FILE = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "shop.db"
-)
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 
 def init_database():
-    conn = sqlite3.connect(DB_FILE)
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL is not set")
 
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS products (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            category TEXT,
-            buy_price REAL DEFAULT 0,
-            sell_price REAL DEFAULT 0,
-            stock INTEGER DEFAULT 0,
-            image TEXT
-        )
-    """)
-
-    conn.commit()
-    conn.close()
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS products (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    category TEXT,
+                    buy_price DOUBLE PRECISION DEFAULT 0,
+                    sell_price DOUBLE PRECISION DEFAULT 0,
+                    stock INTEGER DEFAULT 0,
+                    image TEXT
+                )
+            """)
+        conn.commit()
 
 
 init_database()
@@ -36,26 +34,25 @@ init_database()
 
 @app.route("/api/products")
 def products():
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT name, category, sell_price, stock, image
+                FROM products
+                ORDER BY id DESC
+            """)
 
-    rows = conn.execute("""
-        SELECT name, category, sell_price, stock, image
-        FROM products
-        ORDER BY id DESC
-    """).fetchall()
-
-    conn.close()
+            rows = cur.fetchall()
 
     result = []
 
     for row in rows:
         result.append({
-            "name": row["name"],
-            "category": row["category"],
-            "sell_price": row["sell_price"],
-            "stock": row["stock"],
-            "image": row["image"]
+            "name": row[0],
+            "category": row[1],
+            "sell_price": row[2],
+            "stock": row[3],
+            "image": row[4]
         })
 
     return jsonify(result)
