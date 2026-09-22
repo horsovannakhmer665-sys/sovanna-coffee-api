@@ -101,8 +101,56 @@ def add_product():
         "message": "បានបញ្ចូលទំនិញ",
         "id": product_id
     }), 201
+@app.route("/api/products/<int:product_id>", methods=["PUT"])
+def update_product(product_id):
+    data = request.get_json()
 
+    name = data.get("name")
+    category = data.get("category")
+    buy_price = data.get("buy_price", 0)
+    sell_price = data.get("sell_price", 0)
+    stock = data.get("stock", 0)
+    image = data.get("image")
 
+    if not name:
+        return jsonify({
+            "error": "ត្រូវបញ្ចូលឈ្មោះទំនិញ"
+        }), 400
+
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+
+            cur.execute("""
+                UPDATE products
+                SET
+                    name = %s,
+                    category = %s,
+                    buy_price = %s,
+                    sell_price = %s,
+                    stock = %s,
+                    image = %s
+                WHERE id = %s
+            """, (
+                name,
+                category,
+                buy_price,
+                sell_price,
+                stock,
+                image,
+                product_id
+            ))
+
+            if cur.rowcount == 0:
+                return jsonify({
+                    "error": "រកមិនឃើញទំនិញ"
+                }), 404
+
+        conn.commit()
+
+    return jsonify({
+        "message": "បានកែទំនិញ",
+        "id": product_id
+    })
 
 
 @app.route("/")
