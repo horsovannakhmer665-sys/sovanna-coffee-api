@@ -103,28 +103,6 @@ def add_product():
     }), 201
 
 
-# DELETE - លុបទំនិញតាម ID
-@app.route("/api/products/<int:product_id>", methods=["DELETE"])
-def delete_product(product_id):
-    with psycopg.connect(DATABASE_URL) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "DELETE FROM products WHERE id = %s",
-                (product_id,)
-            )
-            deleted = cur.rowcount
-
-        conn.commit()
-
-    if deleted == 0:
-        return jsonify({
-            "error": "រកមិនឃើញទំនិញ"
-        }), 404
-
-    return jsonify({
-        "message": "បានលុបទំនិញ",
-        "id": product_id
-    })
 
 
 @app.route("/")
