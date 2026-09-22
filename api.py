@@ -8,7 +8,7 @@ app = Flask(__name__)
 CORS(app)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_FILE = os.path.join(BASE_DIR, "shop.db")
+DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "shop.db")
 
 
 @app.route("/api/products")
