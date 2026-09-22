@@ -28,7 +28,9 @@ def init_database():
             """)
         conn.commit()
 
-@app.route("/")
+
+init_database()
+
 
 # GET - បង្ហាញទំនិញទាំងអស់
 @app.route("/api/products", methods=["GET"])
@@ -36,7 +38,7 @@ def products():
     with psycopg.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT name, category, sell_price, stock, image
+                SELECT id, name, category, sell_price, stock, image
                 FROM products
                 ORDER BY id DESC
             """)
@@ -47,11 +49,12 @@ def products():
 
     for row in rows:
         result.append({
-            "name": row[0],
-            "category": row[1],
-            "sell_price": row[2],
-            "stock": row[3],
-            "image": row[4]
+            "id": row[0],
+            "name": row[1],
+            "category": row[2],
+            "sell_price": row[3],
+            "stock": row[4],
+            "image": row[5]
         })
 
     return jsonify(result)
@@ -98,6 +101,30 @@ def add_product():
         "message": "បានបញ្ចូលទំនិញ",
         "id": product_id
     }), 201
+
+
+# DELETE - លុបទំនិញតាម ID
+@app.route("/api/products/<int:product_id>", methods=["DELETE"])
+def delete_product(product_id):
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM products WHERE id = %s",
+                (product_id,)
+            )
+            deleted = cur.rowcount
+
+        conn.commit()
+
+    if deleted == 0:
+        return jsonify({
+            "error": "រកមិនឃើញទំនិញ"
+        }), 404
+
+    return jsonify({
+        "message": "បានលុបទំនិញ",
+        "id": product_id
+    })
 
 
 @app.route("/")
