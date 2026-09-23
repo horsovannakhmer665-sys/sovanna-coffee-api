@@ -26,8 +26,19 @@ def init_database():
                     image TEXT
                 )
             """)
-        conn.commit()
 
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS orders (
+                    id SERIAL PRIMARY KEY,
+                    customer_name TEXT NOT NULL,
+                    phone TEXT NOT NULL,
+                    address TEXT NOT NULL,
+                    order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    status TEXT DEFAULT 'ថ្មី'
+                )
+            """)
+
+        conn.commit()
 
 init_database()
 
