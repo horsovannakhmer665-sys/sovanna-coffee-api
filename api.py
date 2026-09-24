@@ -15,6 +15,8 @@ def init_database():
 
     with psycopg.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
+
+            # Products
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS products (
                     id SERIAL PRIMARY KEY,
@@ -27,18 +29,27 @@ def init_database():
                 )
             """)
 
+            # Orders
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS orders (
                     id SERIAL PRIMARY KEY,
                     customer_name TEXT NOT NULL,
                     phone TEXT NOT NULL,
                     address TEXT NOT NULL,
+                    total DOUBLE PRECISION DEFAULT 0,
                     order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     status TEXT DEFAULT 'ថ្មី'
                 )
             """)
 
+            # Add total to old database if it does not exist
+            cur.execute("""
+                ALTER TABLE orders
+                ADD COLUMN IF NOT EXISTS total DOUBLE PRECISION DEFAULT 0
+            """)
+
         conn.commit()
+
 
 init_database()
 
@@ -46,8 +57,10 @@ init_database()
 # GET - បង្ហាញទំនិញទាំងអស់
 @app.route("/api/products", methods=["GET"])
 def products():
+
     with psycopg.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
+
             cur.execute("""
                 SELECT id, name, category, sell_price, stock, image
                 FROM products
@@ -74,7 +87,8 @@ def products():
 # POST - បញ្ចូលទំនិញថ្មី
 @app.route("/api/products", methods=["POST"])
 def add_product():
-    data = request.get_json()
+
+    data = request.get_json() or {}
 
     name = data.get("name")
     category = data.get("category")
@@ -90,6 +104,7 @@ def add_product():
 
     with psycopg.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
+
             cur.execute("""
                 INSERT INTO products
                 (name, category, buy_price, sell_price, stock, image)
@@ -112,9 +127,13 @@ def add_product():
         "message": "បានបញ្ចូលទំនិញ",
         "id": product_id
     }), 201
+
+
+# PUT - កែទំនិញ
 @app.route("/api/products/<int:product_id>", methods=["PUT"])
 def update_product(product_id):
-    data = request.get_json()
+
+    data = request.get_json() or {}
 
     name = data.get("name")
     category = data.get("category")
@@ -163,31 +182,44 @@ def update_product(product_id):
         "id": product_id
     })
 
+
 # POST - ទទួលកម្ម៉ង់ពី Website
 @app.route("/api/orders", methods=["POST"])
 def create_order():
-    data = request.get_json()
+
+    data = request.get_json() or {}
 
     customer_name = data.get("customer_name")
     phone = data.get("phone")
     address = data.get("address")
+
+    items = data.get("items", [])
 
     if not customer_name or not phone or not address:
         return jsonify({
             "error": "សូមបំពេញឈ្មោះ ទូរស័ព្ទ និងអាសយដ្ឋាន"
         }), 400
 
+    total = 0
+
+    for item in items:
+        quantity = int(item.get("quantity", 0))
+        price = float(item.get("sell_price", 0))
+        total += quantity * price
+
     with psycopg.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
+
             cur.execute("""
                 INSERT INTO orders
-                (customer_name, phone, address)
-                VALUES (%s, %s, %s)
+                (customer_name, phone, address, total)
+                VALUES (%s, %s, %s, %s)
                 RETURNING id
             """, (
                 customer_name,
                 phone,
-                address
+                address,
+                total
             ))
 
             order_id = cur.fetchone()[0]
@@ -196,8 +228,11 @@ def create_order():
 
     return jsonify({
         "message": "បានទទួលកម្ម៉ង់",
-        "order_id": order_id
+        "order_id": order_id,
+        "total": total
     }), 201
+
+
 # GET - មើលកម្ម៉ង់ Online
 @app.route("/api/orders", methods=["GET"])
 def get_orders():
@@ -206,7 +241,14 @@ def get_orders():
         with conn.cursor() as cur:
 
             cur.execute("""
-                SELECT id, customer_name, phone, address, total, order_date, status
+                SELECT
+                    id,
+                    customer_name,
+                    phone,
+                    address,
+                    total,
+                    order_date,
+                    status
                 FROM orders
                 ORDER BY id DESC
             """)
@@ -216,7 +258,6 @@ def get_orders():
     result = []
 
     for row in rows:
-
         result.append({
             "id": row[0],
             "customer_name": row[1],
@@ -229,6 +270,8 @@ def get_orders():
 
     return jsonify(result)
 
+
+# Home
 @app.route("/")
 def home():
     return "Sovanna Coffee API is running"
