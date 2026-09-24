@@ -198,6 +198,36 @@ def create_order():
         "message": "បានទទួលកម្ម៉ង់",
         "order_id": order_id
     }), 201
+# GET - មើលកម្ម៉ង់ Online
+@app.route("/api/orders", methods=["GET"])
+def get_orders():
+
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+
+            cur.execute("""
+                SELECT id, customer_name, phone, address, total, order_date, status
+                FROM orders
+                ORDER BY id DESC
+            """)
+
+            rows = cur.fetchall()
+
+    result = []
+
+    for row in rows:
+
+        result.append({
+            "id": row[0],
+            "customer_name": row[1],
+            "phone": row[2],
+            "address": row[3],
+            "total": row[4],
+            "order_date": str(row[5]),
+            "status": row[6]
+        })
+
+    return jsonify(result)
 
 @app.route("/")
 def home():
