@@ -217,7 +217,6 @@ def update_product(product_id):
         "id": product_id
     })
 
-
 # GET - មើលកម្ម៉ង់ Online
 @app.route("/api/orders", methods=["GET"])
 def get_orders():
@@ -240,21 +239,46 @@ def get_orders():
 
             rows = cur.fetchall()
 
-    result = []
+            result = []
 
-    for row in rows:
-        result.append({
-            "id": row[0],
-            "customer_name": row[1],
-            "phone": row[2],
-            "address": row[3],
-            "total": row[4],
-            "order_date": str(row[5]),
-            "status": row[6]
-        })
+            for row in rows:
+
+                order_id = row[0]
+
+                # ទាញទំនិញក្នុង Order
+                cur.execute("""
+                    SELECT
+                        product_name,
+                        sell_price,
+                        quantity
+                    FROM order_items
+                    WHERE order_id = %s
+                    ORDER BY id
+                """, (order_id,))
+
+                item_rows = cur.fetchall()
+
+                items = []
+
+                for item in item_rows:
+                    items.append({
+                        "name": item[0],
+                        "sell_price": item[1],
+                        "quantity": item[2]
+                    })
+
+                result.append({
+                    "id": row[0],
+                    "customer_name": row[1],
+                    "phone": row[2],
+                    "address": row[3],
+                    "total": row[4],
+                    "order_date": str(row[5]),
+                    "status": row[6],
+                    "items": items
+                })
 
     return jsonify(result)
-
 
 # Home
 @app.route("/")
