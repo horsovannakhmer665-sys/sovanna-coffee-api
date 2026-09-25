@@ -218,56 +218,6 @@ def update_product(product_id):
     })
 
 
-# POST - ទទួលកម្ម៉ង់ពី Website
-@app.route("/api/orders", methods=["POST"])
-def create_order():
-
-    data = request.get_json() or {}
-
-    customer_name = data.get("customer_name")
-    phone = data.get("phone")
-    address = data.get("address")
-
-    items = data.get("items", [])
-
-    if not customer_name or not phone or not address:
-        return jsonify({
-            "error": "សូមបំពេញឈ្មោះ ទូរស័ព្ទ និងអាសយដ្ឋាន"
-        }), 400
-
-    total = 0
-
-    for item in items:
-        quantity = int(item.get("quantity", 0))
-        price = float(item.get("sell_price", 0))
-        total += quantity * price
-
-    with psycopg.connect(DATABASE_URL) as conn:
-        with conn.cursor() as cur:
-
-            cur.execute("""
-                INSERT INTO orders
-                (customer_name, phone, address, total)
-                VALUES (%s, %s, %s, %s)
-                RETURNING id
-            """, (
-                customer_name,
-                phone,
-                address,
-                total
-            ))
-
-            order_id = cur.fetchone()[0]
-
-        conn.commit()
-
-    return jsonify({
-        "message": "បានទទួលកម្ម៉ង់",
-        "order_id": order_id,
-        "total": total
-    }), 201
-
-
 # GET - មើលកម្ម៉ង់ Online
 @app.route("/api/orders", methods=["GET"])
 def get_orders():
