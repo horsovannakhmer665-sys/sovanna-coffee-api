@@ -47,6 +47,16 @@ def init_database():
                 ALTER TABLE orders
                 ADD COLUMN IF NOT EXISTS total DOUBLE PRECISION DEFAULT 0
             """)
+            # Order items
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS order_items (
+                    id SERIAL PRIMARY KEY,
+                    order_id INTEGER NOT NULL,
+                    product_name TEXT NOT NULL,
+                    sell_price DOUBLE PRECISION DEFAULT 0,
+                    quantity INTEGER DEFAULT 1
+                )
+            """)
 
         conn.commit()
 
@@ -85,49 +95,74 @@ def products():
 
 
 # POST - បញ្ចូលទំនិញថ្មី
-@app.route("/api/products", methods=["POST"])
-def add_product():
+@app.route("/api/orders", methods=["POST"])
+def create_order():
 
     data = request.get_json() or {}
 
-    name = data.get("name")
-    category = data.get("category")
-    buy_price = data.get("buy_price", 0)
-    sell_price = data.get("sell_price", 0)
-    stock = data.get("stock", 0)
-    image = data.get("image")
+    customer_name = data.get("customer_name")
+    phone = data.get("phone")
+    address = data.get("address")
 
-    if not name:
+    items = data.get("items", [])
+
+    if not customer_name or not phone or not address:
         return jsonify({
-            "error": "ត្រូវបញ្ចូលឈ្មោះទំនិញ"
+            "error": "សូមបំពេញឈ្មោះ ទូរស័ព្ទ និងអាសយដ្ឋាន"
         }), 400
+
+    total = 0
+
+    for item in items:
+        quantity = int(item.get("quantity", 0))
+        price = float(item.get("sell_price", 0))
+        total += quantity * price
 
     with psycopg.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
 
+            # បង្កើត Order
             cur.execute("""
-                INSERT INTO products
-                (name, category, buy_price, sell_price, stock, image)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO orders
+                (customer_name, phone, address, total)
+                VALUES (%s, %s, %s, %s)
                 RETURNING id
             """, (
-                name,
-                category,
-                buy_price,
-                sell_price,
-                stock,
-                image
+                customer_name,
+                phone,
+                address,
+                total
             ))
 
-            product_id = cur.fetchone()[0]
+            order_id = cur.fetchone()[0]
+
+            # រក្សាទុកទំនិញក្នុង Order
+            for item in items:
+
+                product_name = item.get("name", "")
+                quantity = int(item.get("quantity", 0))
+                price = float(item.get("sell_price", 0))
+
+                if product_name and quantity > 0:
+
+                    cur.execute("""
+                        INSERT INTO order_items
+                        (order_id, product_name, sell_price, quantity)
+                        VALUES (%s, %s, %s, %s)
+                    """, (
+                        order_id,
+                        product_name,
+                        price,
+                        quantity
+                    ))
 
         conn.commit()
 
     return jsonify({
-        "message": "បានបញ្ចូលទំនិញ",
-        "id": product_id
+        "message": "បានទទួលកម្ម៉ង់",
+        "order_id": order_id,
+        "total": total
     }), 201
-
 
 # PUT - កែទំនិញ
 @app.route("/api/products/<int:product_id>", methods=["PUT"])
