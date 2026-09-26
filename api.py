@@ -113,13 +113,51 @@ def create_order():
 
     total = 0
 
-    for item in items:
-        quantity = int(item.get("quantity", 0))
-        price = float(item.get("sell_price", 0))
-        total += quantity * price
-
     with psycopg.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
+
+            # ពិនិត្យទំនិញ និងយកតម្លៃពិតពី Database
+            checked_items = []
+
+            for item in items:
+
+                product_id = int(item.get("id", 0))
+                quantity = int(item.get("quantity", 0))
+
+                if product_id <= 0 or quantity <= 0:
+                    return jsonify({
+                        "error": "ទិន្នន័យទំនិញមិនត្រឹមត្រូវ"
+                    }), 400
+
+                cur.execute("""
+                    SELECT name, sell_price, stock
+                    FROM products
+                    WHERE id = %s
+                """, (product_id,))
+
+                product = cur.fetchone()
+
+                if not product:
+                    return jsonify({
+                        "error": f"រកមិនឃើញទំនិញ ID {product_id}"
+                    }), 404
+
+                product_name = product[0]
+                price = float(product[1])
+                stock = int(product[2])
+
+                if quantity > stock:
+                    return jsonify({
+                        "error": f"{product_name} ស្តុកមិនគ្រប់"
+                    }), 400
+
+                total += quantity * price
+
+                checked_items.append({
+                    "name": product_name,
+                    "price": price,
+                    "quantity": quantity
+                })
 
             # បង្កើត Order
             cur.execute("""
@@ -137,24 +175,18 @@ def create_order():
             order_id = cur.fetchone()[0]
 
             # រក្សាទុកទំនិញក្នុង Order
-            for item in items:
+            for item in checked_items:
 
-                product_name = item.get("name", "")
-                quantity = int(item.get("quantity", 0))
-                price = float(item.get("sell_price", 0))
-
-                if product_name and quantity > 0:
-
-                    cur.execute("""
-                        INSERT INTO order_items
-                        (order_id, product_name, sell_price, quantity)
-                        VALUES (%s, %s, %s, %s)
-                    """, (
-                        order_id,
-                        product_name,
-                        price,
-                        quantity
-                    ))
+                cur.execute("""
+                    INSERT INTO order_items
+                    (order_id, product_name, sell_price, quantity)
+                    VALUES (%s, %s, %s, %s)
+                """, (
+                    order_id,
+                    item["name"],
+                    item["price"],
+                    item["quantity"]
+                ))
 
         conn.commit()
 
